@@ -2,8 +2,6 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import connectDB from "./config/db.js";
-import path from "path";
-import fs from "fs";
 
 import authRoutes from "./routes/authRoutes.js";
 import enquiryRoutes from "./routes/enquiryRoutes.js";
@@ -37,32 +35,8 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ========================
-// Uploads Folder
-// ========================
-const uploadPath = path.join(process.cwd(), "uploads");
-
-// Create uploads folder if it doesn't exist
-if (!fs.existsSync(uploadPath)) {
-  fs.mkdirSync(uploadPath, { recursive: true });
-}
-
-// Serve Static Images
-app.use("/uploads", express.static(uploadPath));
-
-// ========================
-// Debug Uploads
-// ========================
-app.get("/debug/uploads", (req, res) => {
-  res.json({
-    cwd: process.cwd(),
-    uploadPath,
-    exists: fs.existsSync(uploadPath),
-    files: fs.existsSync(uploadPath)
-      ? fs.readdirSync(uploadPath)
-      : [],
-  });
-});
+// Static Folder
+app.use("/uploads", express.static("uploads"));
 
 // ========================
 // API Routes
