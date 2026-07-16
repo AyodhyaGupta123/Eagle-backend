@@ -1,5 +1,8 @@
 import Property from "../models/Property.js";
-import cloudinary, { isCloudinaryConfigured } from "../config/cloudinary.js";
+import cloudinary, {
+  configureCloudinary,
+  isCloudinaryConfigured,
+} from "../config/cloudinary.js";
 
 const uploadImage = (file) =>
   new Promise((resolve, reject) => {
@@ -37,6 +40,10 @@ export const createProperty = async (req, res) => {
         success: false,
         message: "Image storage is not configured. Add Cloudinary environment variables.",
       });
+    }
+
+    if (req.files?.length) {
+      configureCloudinary();
     }
 
     const fileImages = req.files?.length
