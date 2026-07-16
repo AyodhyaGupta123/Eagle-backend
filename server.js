@@ -17,6 +17,13 @@ const app = express();
 // ========================
 connectDB();
 
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
+
 // ========================
 // Middleware
 // ========================
