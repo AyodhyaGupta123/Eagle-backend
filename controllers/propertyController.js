@@ -1,4 +1,21 @@
 import Property from "../models/Property.js";
+import cloudinary, { isCloudinaryConfigured } from "../config/cloudinary.js";
+
+const uploadImage = (file) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "eagle/products",
+        resource_type: "image",
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+
+    stream.end(file.buffer);
+  });
 
 // ===================================
 // Add Property
@@ -15,9 +32,15 @@ export const createProperty = async (req, res) => {
       });
     }
 
-    // Uploaded Images
-    const fileImages = req.files
-      ? req.files.map((file) => `/uploads/${file.filename}`)
+    if (req.files?.length && !isCloudinaryConfigured()) {
+      return res.status(500).json({
+        success: false,
+        message: "Image storage is not configured. Add Cloudinary environment variables.",
+      });
+    }
+
+    const fileImages = req.files?.length
+      ? await Promise.all(req.files.map(uploadImage))
       : [];
 
     // External Image URLs
