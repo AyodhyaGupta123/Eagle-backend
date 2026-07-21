@@ -1,14 +1,16 @@
-import express from "express";
 import dotenv from "dotenv";
+import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
+import transporter from "./config/mailer.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import enquiryRoutes from "./routes/enquiryRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import propertyRoutes from "./routes/propertyRoutes.js";
+import newsletterRoutes from "./routes/newsletterRoutes.js";
 
 dotenv.config();
 
@@ -18,7 +20,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ========================
 // Database Connection
 // ========================
-connectDB();
+connectDB();  
+
+transporter
+  .verify()
+  .then(() => {
+    console.log("✅ Hostinger SMTP Connected Successfully");
+  })
+  .catch((error) => {
+    console.error("❌ SMTP Connection Failed:", error.message);
+  });
+
 
 app.use(
   cors({
@@ -57,6 +69,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/enquiries", enquiryRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/properties", propertyRoutes);
+app.use("/api/newsletter", newsletterRoutes);
 
 // ========================
 // Health Check
