@@ -25,6 +25,13 @@ const uploadImage = (file) =>
 // ===================================
 export const createProperty = async (req, res) => {
   try {
+    console.log("Request Body:", req.body);
+
+    console.log(
+      "Property Schema Fields:",
+      Object.keys(Property.schema.paths)
+    );
+
     const { title, price, description } = req.body;
 
     // Validation
