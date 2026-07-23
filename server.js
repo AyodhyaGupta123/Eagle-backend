@@ -4,7 +4,6 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
-import transporter from "./config/mailer.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import enquiryRoutes from "./routes/enquiryRoutes.js";
@@ -21,15 +20,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Database Connection
 // ========================
 connectDB();  
-
-transporter
-  .verify()
-  .then(() => {
-    console.log("✅ Hostinger SMTP Connected Successfully");
-  })
-  .catch((error) => {
-    console.error("❌ SMTP Connection Failed:", error.message);
-  });
 
 
 app.use(
