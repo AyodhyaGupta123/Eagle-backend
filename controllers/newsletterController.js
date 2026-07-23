@@ -1,4 +1,4 @@
-import resend from "../config/resend.js";
+import transporter from "../config/mailer.js";
 
 const escapeHtml = (value = "") => {
   return String(value)
@@ -32,20 +32,20 @@ export const subscribeNewsletter = async (req, res) => {
     }
 
     const adminEmail = process.env.ADMIN_EMAIL;
+    const smtpUser = process.env.SMTP_USER;
 
     if (!adminEmail) {
       throw new Error("ADMIN_EMAIL is missing in environment variables");
     }
 
-    const { data, error } = await resend.emails.send({
-      from:
-        process.env.RESEND_FROM_EMAIL ||
-        "Eagle Incense Sticks <onboarding@resend.dev>",
+    if (!smtpUser) {
+      throw new Error("SMTP_USER is missing in environment variables");
+    }
 
-      to: [adminEmail],
-
+    const info = await transporter.sendMail({
+      from: `"Eagle Incense Sticks" <${smtpUser}>`,
+      to: adminEmail,
       replyTo: cleanEmail,
-
       subject: "New Newsletter Subscription",
 
       html: `
@@ -84,20 +84,12 @@ export const subscribeNewsletter = async (req, res) => {
       `,
     });
 
-    if (error) {
-      console.error("Resend newsletter error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Unable to send subscription email",
-      });
-    }
-
-    console.log("Newsletter email sent:", data?.id);
+    console.log("Newsletter email sent:", info.messageId);
 
     return res.status(200).json({
       success: true,
       message: "Subscribed successfully",
+      emailSent: true,
     });
   } catch (error) {
     console.error("Newsletter error:", error);

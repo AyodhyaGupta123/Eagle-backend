@@ -1,5 +1,5 @@
 import Enquiry from "../models/Enquiry.js";
-import resend from "../config/resend.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 // HTML injection se bachne ke liye
 const escapeHtml = (value = "") => {
@@ -51,11 +51,12 @@ export const createEnquiry = async (req, res) => {
       productName: cleanProductName,
     });
 
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL ||
-      "Eagle Incense Sticks <onboarding@resend.dev>";
-
+    const smtpUser = process.env.SMTP_USER;
     const adminEmail = process.env.ADMIN_EMAIL;
+
+    if (!smtpUser) {
+      console.error("SMTP_USER is missing in environment variables");
+    }
 
     if (!adminEmail) {
       console.error("ADMIN_EMAIL is missing in environment variables");
@@ -69,207 +70,102 @@ export const createEnquiry = async (req, res) => {
     const safeMessage = escapeHtml(cleanMessage);
     const safeProductName = escapeHtml(cleanProductName);
 
-    /*
-     * Admin email aur customer confirmation email parallel mein send honge.
-     * Promise.allSettled use kiya hai taaki ek email fail hone par
-     * doosri email aur enquiry submission fail na ho.
-     */
+    // Admin ke liye email HTML
+    const adminHtml = `
+      <div style="max-width:600px;margin:0 auto;padding:24px;background:#f6f6f6;font-family:Arial,sans-serif;">
+        <div style="background:#ffffff;padding:28px;border-radius:10px;border:1px solid #eeeeee;">
+          <h2 style="margin-top:0;color:#222;">
+            ${safeProductName ? "New Quote Request" : "New Website Enquiry"}
+          </h2>
+          ${
+            safeProductName
+              ? `<p><strong>Product:</strong> ${safeProductName}</p>`
+              : ""
+          }
+          <p><strong>Name:</strong> ${safeName}</p>
+          <p><strong>Email:</strong> ${safeEmail}</p>
+          <p><strong>Phone:</strong> ${safeCountryCode} ${safePhone}</p>
+          ${
+            safeCountry
+              ? `<p><strong>Country:</strong> ${safeCountry}</p>`
+              : ""
+          }
+          <div style="margin-top:16px;padding:16px;background:#f5efe3;border-radius:8px;">
+            <strong>Message:</strong><br/>${safeMessage}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Customer ke liye confirmation email HTML
+    const customerHtml = `
+      <div style="max-width:600px;margin:0 auto;padding:24px;background:#f6f6f6;font-family:Arial,sans-serif;">
+        <div style="background:#ffffff;padding:28px;border-radius:10px;border:1px solid #eeeeee;">
+          <h2 style="margin-top:0;color:#222;">Hi ${safeName},</h2>
+          <p>
+            Thank you for ${
+              safeProductName ? "your quote request" : "reaching out to us"
+            }. We have received your enquiry and our team will get back to you shortly.
+          </p>
+          ${
+            safeProductName
+              ? `<p><strong>Product:</strong> ${safeProductName}</p>`
+              : ""
+          }
+          <div style="margin-top:16px;padding:16px;background:#f5efe3;border-radius:8px;">
+            <strong>Your message:</strong><br/>${safeMessage}
+          </div>
+          <p style="margin-top:20px;">Regards,<br/>Eagle Incense Sticks Team</p>
+        </div>
+      </div>
+    `;
+
     const emailTasks = [];
 
-    if (adminEmail) {
+    // Admin notification email
+    if (adminEmail && smtpUser) {
       emailTasks.push(
-        resend.emails.send({
-          from: fromEmail,
-          to: [adminEmail],
+        sendEmail({
+          to: adminEmail,
           replyTo: cleanEmail,
-
           subject: cleanProductName
             ? `New Quote Request - ${cleanProductName}`
             : "New Website Enquiry",
-
-          html: `
-            <div style="
-              max-width:650px;
-              margin:0 auto;
-              padding:24px;
-              font-family:Arial,sans-serif;
-              background:#f6f6f6;
-            ">
-              <div style="
-                padding:28px;
-                background:#ffffff;
-                border-radius:10px;
-                border:1px solid #eeeeee;
-              ">
-                <h2 style="margin-top:0;color:#222;">
-                  New Website Enquiry
-                </h2>
-
-                <p>
-                  <strong>Name:</strong>
-                  ${safeName}
-                </p>
-
-                <p>
-                  <strong>Email:</strong>
-                  ${safeEmail}
-                </p>
-
-                <p>
-                  <strong>Phone:</strong>
-                  ${safeCountryCode} ${safePhone}
-                </p>
-
-                <p>
-                  <strong>Country:</strong>
-                  ${safeCountry || "Not provided"}
-                </p>
-
-                ${
-                  safeProductName
-                    ? `
-                      <p>
-                        <strong>Product:</strong>
-                        ${safeProductName}
-                      </p>
-                    `
-                    : ""
-                }
-
-                <div style="
-                  margin-top:20px;
-                  padding:16px;
-                  background:#f5efe3;
-                  border-radius:8px;
-                ">
-                  <strong>Message:</strong>
-
-                  <p style="
-                    margin-bottom:0;
-                    white-space:pre-line;
-                    line-height:1.6;
-                  ">
-                    ${safeMessage}
-                  </p>
-                </div>
-
-                <p style="margin-top:20px;color:#666;">
-                  <strong>Enquiry ID:</strong>
-                  ${enquiry._id}
-                </p>
-              </div>
-            </div>
-          `,
+          html: adminHtml,
         }),
       );
     }
 
-    emailTasks.push(
-      resend.emails.send({
-        from: fromEmail,
-        to: [cleanEmail],
-        replyTo: adminEmail || "info@eagleincensesticks.com",
-
-        subject: cleanProductName
-          ? "We received your quote request"
-          : "We received your enquiry",
-
-        html: `
-          <div style="
-            max-width:650px;
-            margin:0 auto;
-            padding:24px;
-            font-family:Arial,sans-serif;
-            background:#f6f6f6;
-          ">
-            <div style="
-              padding:28px;
-              background:#ffffff;
-              border-radius:10px;
-              border:1px solid #eeeeee;
-            ">
-              <h2 style="margin-top:0;color:#222;">
-                Hello ${safeName},
-              </h2>
-
-              <p>
-                Thank you for contacting Eagle Incense Sticks.
-              </p>
-
-              ${
-                safeProductName
-                  ? `
-                    <p>
-                      We received your quote request for
-                      <strong>${safeProductName}</strong>.
-                    </p>
-                  `
-                  : `
-                    <p>
-                      We received your enquiry successfully.
-                    </p>
-                  `
-              }
-
-              <p>
-                Our team will contact you within 24 hours.
-              </p>
-
-              <div style="
-                margin-top:20px;
-                padding:16px;
-                background:#f5efe3;
-                border-radius:8px;
-              ">
-                <strong>Your Message:</strong>
-
-                <p style="
-                  margin-bottom:0;
-                  white-space:pre-line;
-                  line-height:1.6;
-                ">
-                  ${safeMessage}
-                </p>
-              </div>
-
-              <p style="margin-top:30px;line-height:1.7;">
-                Regards,<br />
-                <strong>Eagle Incense Sticks</strong><br />
-                +91 9981997440<br />
-                info@eagleincensesticks.com
-              </p>
-            </div>
-          </div>
-        `,
-      }),
-    );
+    // Customer confirmation email
+    if (smtpUser) {
+      emailTasks.push(
+        sendEmail({
+          to: cleanEmail,
+          replyTo: adminEmail || smtpUser,
+          subject: cleanProductName
+            ? "We received your quote request"
+            : "We received your enquiry",
+          html: customerHtml,
+        }),
+      );
+    }
 
     const emailResults = await Promise.allSettled(emailTasks);
 
     emailResults.forEach((result, index) => {
       if (result.status === "rejected") {
-        console.error(`Email ${index + 1} failed:`, result.reason);
-        return;
-      }
-
-      if (result.value?.error) {
-        console.error(
-          `Resend email ${index + 1} error:`,
-          result.value.error,
-        );
+        console.error(`Nodemailer email ${index + 1} failed:`, result.reason);
       } else {
         console.log(
-          `Resend email ${index + 1} sent:`,
-          result.value?.data?.id,
+          `Nodemailer email ${index + 1} sent:`,
+          result.value?.messageId,
         );
       }
     });
 
-    const emailsSentSuccessfully = emailResults.every(
-      (result) =>
-        result.status === "fulfilled" &&
-        !result.value?.error,
-    );
+    const emailsSentSuccessfully =
+      emailTasks.length > 0 &&
+      emailResults.every((result) => result.status === "fulfilled");
 
     return res.status(201).json({
       success: true,

@@ -1,9 +1,13 @@
-import dotenv from "dotenv";
+import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import connectDB from "./config/db.js";
+import transporter from "./config/mailer.js";
+import mailRoutes from "./routes/mailRoutes.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import enquiryRoutes from "./routes/enquiryRoutes.js";
@@ -11,35 +15,42 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import propertyRoutes from "./routes/propertyRoutes.js";
 import newsletterRoutes from "./routes/newsletterRoutes.js";
 
-dotenv.config();
+console.log("SMTP_USER:", process.env.SMTP_USER ? "SET" : "MISSING");
+console.log("SMTP_PASS:", process.env.SMTP_PASS ? "SET" : "MISSING");
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ========================
-// Database Connection
-// ========================
-connectDB();  
+transporter
+  .verify()
+  .then(() => {
+    console.log("✅ SMTP Ready");
+  })
+  .catch((error) => {
+    console.error("❌ SMTP Verify Error:", error.message);
+  });
 
+// Database
+connectDB();
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  }),
-);
-
-// ========================
 // Middleware
-// ========================
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://eagleincensesticks.com",
+  "https://www.eagleincensesticks.com",
+  "https://admin.eagleincensesticks.com",
+  "https://eagle-nt3o-git-main-ayodhya-guptas-projects.vercel.app",
+];
+
 app.use(
   cors({
-    origin: [
-      "https://eagleincensesticks.com",
-      "https://www.eagleincensesticks.com",
-      "https://admin.eagleincensesticks.com",
-      "https://eagle-nt3o-git-main-ayodhya-guptas-projects.vercel.app",
-    ],
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -49,21 +60,16 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static Folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ========================
-// API Routes
-// ========================
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/enquiries", enquiryRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/properties", propertyRoutes);
 app.use("/api/newsletter", newsletterRoutes);
+app.use("/api/mail", mailRoutes);
 
-// ========================
-// Health Check
-// ========================
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -71,9 +77,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// ========================
-// 404 Route
-// ========================
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -81,9 +84,6 @@ app.use((req, res) => {
   });
 });
 
-// ========================
-// Global Error Handler
-// ========================
 app.use((err, req, res, next) => {
   console.error(err.stack);
 
@@ -93,9 +93,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ========================
-// Server
-// ========================
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
